@@ -23,7 +23,7 @@ No sign-up or approval is required.
 
 ### Admin
 A flag (`is_admin`) that can be set per user in the database.
-Admin-only features are not yet implemented but the role is reserved for future use.
+Admins see extra actions in the main menu and can manage meetings.
 
 ---
 
@@ -48,9 +48,13 @@ Stored per user:
 
 When a user starts the bot or returns from any flow, they see a main menu with available actions.
 
-Current menu items:
+Menu items visible to all members:
 - Add Book
 - View Books
+- Current Meeting
+
+Additional item visible to admins only:
+- Schedule Meeting
 
 ---
 
@@ -100,12 +104,51 @@ A member can remove a book from their own list.
 
 ---
 
+### F-06 — Schedule Meeting (admin only)
+**Status:** Implemented
+
+An admin can create a club meeting by selecting a book and a future date.
+
+Flow:
+1. Admin taps **Schedule Meeting** (only visible to admins).
+2. Bot shows all books saved in the system (deduplicated by Google volume ID). Admin picks one by number.
+3. Bot shows an inline calendar. Past dates are disabled. Admin taps a future date.
+4. The meeting is saved. Any previously active meeting is automatically deactivated — only one active meeting can exist at a time.
+5. Confirmation is shown and the admin is returned to the main menu.
+
+Constraints:
+- Only users with `is_admin = true` can access this flow. Other users receive an error if they somehow trigger it.
+- Only future dates can be selected (today included).
+
+---
+
+### F-07 — Current Meeting
+**Status:** Implemented
+
+Any user (including admins) can view the currently active meeting.
+
+- Shows: book title, authors, meeting date.
+- If no meeting is active, a friendly message is shown.
+- Admins see an additional **Remove Meeting** button.
+
+---
+
+### F-08 — Remove Meeting (admin only)
+**Status:** Implemented
+
+An admin can remove the active meeting.
+
+- Accessible via the **Remove Meeting** button on the Current Meeting screen.
+- The meeting record is permanently deleted.
+- Only admins can remove a meeting.
+
+---
+
 ## Out of scope (not yet implemented)
 
 The following are planned for future iterations and must not be built until requirements are written here first.
 
 - Voting / rating books
-- Admin commands
 - Shared club-wide book list
 - Reading progress tracking
 - Notifications / reminders

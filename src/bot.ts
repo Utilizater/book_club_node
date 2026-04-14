@@ -12,6 +12,14 @@ import {
   handleBackToResults,
 } from './handlers/addBookHandler';
 import { handleViewBooks, handleRemoveBook } from './handlers/viewBooksHandler';
+import {
+  handleScheduleMeeting,
+  handlePickMeetingBook,
+  handleCalendarNav,
+  handleCalendarDay,
+  handleCurrentMeeting,
+  handleRemoveMeeting,
+} from './handlers/meetingHandler';
 import { getSession, resetSession } from './session/sessionManager';
 
 export function createBot(): Telegraf<BotContext> {
@@ -32,51 +40,87 @@ export function createBot(): Telegraf<BotContext> {
     }
   });
 
-  // Main menu
+  // ── Menu ──────────────────────────────────────────────────────────────────
   bot.action('menu', async (ctx) => {
     await ctx.answerCbQuery();
     await showMainMenu(ctx);
   });
 
-  // Add Book
+  // ── Books ─────────────────────────────────────────────────────────────────
   bot.action('add_book', async (ctx) => {
     await ctx.answerCbQuery();
     await handleAddBook(ctx);
   });
 
-  // View Books
   bot.action('view_books', async (ctx) => {
     await ctx.answerCbQuery();
     await handleViewBooks(ctx);
   });
 
-  // Cancel — return to main menu and clear session
   bot.action('cancel', async (ctx) => {
     await ctx.answerCbQuery();
     resetSession(ctx.chat?.id ?? 0);
     await showMainMenu(ctx);
   });
 
-  // Pick a search result: pick:<index>:<queryId>
+  // pick:<index>:<queryId>
   bot.action(/^pick:(\d+):(.+)$/, async (ctx) => {
-    const index = parseInt(ctx.match[1], 10);
-    const queryId = ctx.match[2];
-    await handlePickBook(ctx, index, queryId);
+    await handlePickBook(ctx, parseInt(ctx.match[1], 10), ctx.match[2]);
   });
 
-  // Save the selected book: save:<queryId>
+  // save:<queryId>
   bot.action(/^save:(.+)$/, async (ctx) => {
     await handleSaveBook(ctx, ctx.match[1]);
   });
 
-  // Back to results: back_results:<queryId>
+  // back_results:<queryId>
   bot.action(/^back_results:(.+)$/, async (ctx) => {
     await handleBackToResults(ctx, ctx.match[1]);
   });
 
-  // Remove a book from the user's list: remove_book:<bookId>
+  // remove_book:<bookId>
   bot.action(/^remove_book:(.+)$/, async (ctx) => {
     await handleRemoveBook(ctx, ctx.match[1]);
+  });
+
+  // ── Meetings ──────────────────────────────────────────────────────────────
+  bot.action('schedule_meeting', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleScheduleMeeting(ctx);
+  });
+
+  bot.action('current_meeting', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleCurrentMeeting(ctx);
+  });
+
+  bot.action('remove_meeting', async (ctx) => {
+    await handleRemoveMeeting(ctx);
+  });
+
+  // pick_meeting_book:<index>:<queryId>
+  bot.action(/^pick_meeting_book:(\d+):(.+)$/, async (ctx) => {
+    await handlePickMeetingBook(ctx, parseInt(ctx.match[1], 10), ctx.match[2]);
+  });
+
+  // cal_noop — non-clickable calendar cells (header, past days, empty slots)
+  bot.action('cal_noop', async (ctx) => {
+    await ctx.answerCbQuery();
+  });
+
+  // cal_nav:<year>:<month>
+  bot.action(/^cal_nav:(\d+):(\d+)$/, async (ctx) => {
+    await handleCalendarNav(ctx, parseInt(ctx.match[1], 10), parseInt(ctx.match[2], 10));
+  });
+
+  // cal_day:<year>:<month>:<day>
+  bot.action(/^cal_day:(\d+):(\d+):(\d+)$/, async (ctx) => {
+    await handleCalendarDay(
+      ctx,
+      parseInt(ctx.match[1], 10),
+      parseInt(ctx.match[2], 10),
+      parseInt(ctx.match[3], 10)
+    );
   });
 
   // Global error handler — keeps the bot alive and gives the user feedback
@@ -84,16 +128,11 @@ export function createBot(): Telegraf<BotContext> {
     const error = err as Error;
     console.error(`Error for update ${ctx.update.update_id}:`, error.message);
 
-    // "Query is too old" means the user tapped a button from a previous bot session.
-    // Silently ignore it — there is nothing useful we can send back.
     if (error.message.includes('query is too old') || error.message.includes('query ID is invalid')) {
       return;
     }
 
-    // For everything else, try to notify the user without crashing.
-    ctx.reply('Something went wrong. Please try again.').catch(() => {
-      // Ignore secondary failures (e.g. bot was blocked by user)
-    });
+    ctx.reply('Something went wrong. Please try again.').catch(() => {});
   });
 
   return bot;

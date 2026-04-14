@@ -6,7 +6,7 @@
 
 ## Project concept
 
-A Telegram bot for a book club. Members can search for books via the Google Books API, save books to a personal list, and remove books they added. The bot is personal-first: each user has their own book list. There is an `is_admin` flag on users reserved for future role-based features.
+A Telegram bot for a book club. Members can search for books via the Google Books API, save books to a personal list, and remove books they added. Admins can schedule and remove club meetings. The bot is personal-first: each user has their own book list and a role flag (`is_admin`).
 
 ---
 
@@ -65,15 +65,17 @@ src/
   models/
     User.ts                     users collection
     Book.ts                     books collection
+    Meeting.ts                  meetings collection
 
   middleware/
     userMiddleware.ts           Upserts the Telegram user into MongoDB on every interaction
                                 and attaches the document to ctx.dbUser
 
   handlers/
-    menuHandler.ts              showMainMenu() — sends the main inline keyboard
+    menuHandler.ts              showMainMenu() — dynamic keyboard (admin sees extra button)
     addBookHandler.ts           Full "Add Book" flow (search → pick → save)
     viewBooksHandler.ts         "View Books" flow + remove book action
+    meetingHandler.ts           Schedule / view / remove meeting flows
 
   services/
     googleBooksService.ts       Google Books API client (search with Russian-first strategy)
@@ -83,6 +85,7 @@ src/
 
   utils/
     formatters.ts               HTML-safe text formatters for book cards and lists
+    calendar.ts                 Builds the inline calendar keyboard for date picking
 ```
 
 ---
@@ -119,13 +122,27 @@ src/
 
 **Index:** compound unique on `{ externalId, addedBy }` — the same book can be added by multiple users, but one user cannot add the same volume twice.
 
+### Meeting (`meetings` collection)
+
+| Field | Type | Notes |
+|---|---|---|
+| `book` | ObjectId | Ref `Book`. Required |
+| `date` | Date | Meeting date. Required |
+| `isActive` | Boolean | Default `true`. Only one active meeting at a time |
+| `createdBy` | ObjectId | Ref `User`. Required |
+| `createdAt` | Date | Auto |
+| `updatedAt` | Date | Auto |
+
+Only one document has `isActive: true` at a time. Creating a new meeting sets all previous ones to `isActive: false`.
+
 ---
 
 ## Bot flows
 
 ### Main menu
 Shown on `/start` and after any completed or cancelled action.
-Buttons: **Add Book**, **View Books**.
+Buttons for all users: **Add Book**, **View Books**, **Current Meeting**.
+Additional button for admins: **Schedule Meeting**.
 
 ### Add Book
 1. Bot asks for a title (text input).
@@ -141,6 +158,27 @@ Buttons: **Add Book**, **View Books**.
 3. Each book has a `[🗑 Remove #N]` button.
 4. On remove: ownership is verified server-side before deletion. After removal the list is re-rendered (or main menu shown if now empty).
 
+### Schedule Meeting (admin only)
+1. Admin taps **Schedule Meeting**.
+2. All books in the system are loaded and deduplicated by `externalId`. Shown as a numbered list.
+3. Admin picks a book by number.
+4. An inline calendar is shown. Past days are non-clickable (`·`). Navigation arrows move between months; back arrow hidden on current month.
+5. Admin taps a future date.
+6. All existing active meetings are deactivated. New meeting is created with `isActive: true`.
+7. Confirmation message shown → main menu.
+
+### Current Meeting
+1. User taps **Current Meeting**.
+2. Active meeting is loaded with `book` populated.
+3. Shows: book title, authors, meeting date.
+4. If no active meeting: friendly empty state.
+5. Admins see an additional **Remove Meeting** button.
+
+### Remove Meeting (admin only)
+1. Admin taps **Remove Meeting** from the Current Meeting screen.
+2. Active meeting is permanently deleted.
+3. Confirmation message → main menu.
+
 ---
 
 ## Session state machine
@@ -149,15 +187,21 @@ Stored in memory (Map keyed by chat ID). Resets on bot restart.
 
 ```
 idle
-  └─ add_book action → waiting_for_search_query
-       └─ text message → showing_search_results  (queryId generated)
-            └─ pick button → showing_selected_book
+  └─ add_book → waiting_for_search_query
+       └─ text message → showing_search_results  (queryId)
+            └─ pick → showing_selected_book
                  ├─ save → idle
                  ├─ back_results → showing_search_results
                  └─ cancel → idle
+
+  └─ schedule_meeting (admin) → scheduling_meeting_book_select  (meetingQueryId)
+       └─ pick_meeting_book → scheduling_meeting_date_select  (meetingBookId stored)
+            └─ cal_day → idle  (meeting saved)
+            └─ cal_nav → stays in scheduling_meeting_date_select  (keyboard edited in place)
+            └─ cancel → idle
 ```
 
-`queryId` is a short timestamp+random string embedded in callback data. Clicking a button from a previous search detects the stale `queryId` and shows an alert instead of acting on it.
+`queryId` / `meetingQueryId` are short timestamp+random strings embedded in callback data to detect stale button presses.
 
 ---
 
@@ -173,6 +217,13 @@ idle
 | `save:<queryId>` | handleSaveBook | |
 | `back_results:<queryId>` | handleBackToResults | |
 | `remove_book:<bookId>` | handleRemoveBook | bookId = MongoDB _id hex |
+| `schedule_meeting` | handleScheduleMeeting | admin only |
+| `current_meeting` | handleCurrentMeeting | |
+| `remove_meeting` | handleRemoveMeeting | admin only |
+| `pick_meeting_book:<i>:<queryId>` | handlePickMeetingBook | |
+| `cal_noop` | answerCbQuery (silent) | header / past days / empty cells |
+| `cal_nav:<year>:<month>` | handleCalendarNav | edits calendar in place |
+| `cal_day:<year>:<month>:<day>` | handleCalendarDay | saves meeting |
 
 All callback data stays well under Telegram's 64-byte limit.
 
@@ -193,8 +244,8 @@ All callback data stays well under Telegram's 64-byte limit.
 
 ## Known limitations / future work
 
-- Session is in-memory — restarts clear all in-flight Add Book flows.
-- No pagination on the books list.
-- `is_admin` flag exists but no admin-only commands are implemented yet.
+- Session is in-memory — restarts clear all in-flight Add Book and Schedule Meeting flows.
+- No pagination on the books list or meeting book selection.
 - No voting or social features yet.
 - No user authentication beyond Telegram identity.
+- If a book referenced by a meeting is deleted, the meeting view shows "Unknown" for the title — no guard is in place yet.
