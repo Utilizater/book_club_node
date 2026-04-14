@@ -66,6 +66,7 @@ src/
     User.ts                     users collection
     Book.ts                     books collection
     Meeting.ts                  meetings collection
+    Progress.ts                 per-user per-meeting reading progress
 
   middleware/
     userMiddleware.ts           Upserts the Telegram user into MongoDB on every interaction
@@ -76,6 +77,7 @@ src/
     addBookHandler.ts           Full "Add Book" flow (search → pick → save)
     viewBooksHandler.ts         "View Books" flow + remove book action
     meetingHandler.ts           Schedule / view / remove meeting flows
+    progressHandler.ts          My Progress + Group Progress flows
 
   services/
     googleBooksService.ts       Google Books API client (search with Russian-first strategy)
@@ -134,6 +136,22 @@ src/
 | `updatedAt` | Date | Auto |
 
 Only one document has `isActive: true` at a time. Creating a new meeting sets all previous ones to `isActive: false`.
+
+### Progress (`progresses` collection)
+
+| Field | Type | Notes |
+|---|---|---|
+| `user` | ObjectId | Ref `User`. Required |
+| `meeting` | ObjectId | Ref `Meeting`. Required |
+| `type` | `'audio' \| 'paper'` | Required |
+| `totalPages` | Number | Paper only |
+| `currentPage` | Number | Paper only |
+| `percentage` | Number | 0-100. Directly set for audio; calculated for paper |
+| `createdAt` | Date | Auto |
+| `updatedAt` | Date | Auto |
+
+**Index:** compound unique on `{ user, meeting }` — one progress entry per user per meeting.
+Progress records are deleted when the meeting they belong to is created over or removed.
 
 ---
 
@@ -194,6 +212,14 @@ idle
                  ├─ back_results → showing_search_results
                  └─ cancel → idle
 
+  └─ my_progress → (no state change; routing via DB lookup + existing progress check)
+       └─ set_progress_audio → setting_progress_percentage  (text input)
+       └─ set_progress_paper → setting_progress_total_pages  (text input)
+            └─ total pages entered → setting_progress_current_page  (text input)
+                 └─ current page entered → saved → idle
+       └─ update_progress → setting_progress_percentage or setting_progress_current_page
+       └─ restart_progress → delete record → type selection
+
   └─ schedule_meeting (admin) → scheduling_meeting_book_select  (meetingQueryId)
        └─ pick_meeting_book → scheduling_meeting_date_select  (meetingBookId stored)
             └─ cal_day → idle  (meeting saved)
@@ -220,6 +246,12 @@ idle
 | `schedule_meeting` | handleScheduleMeeting | admin only |
 | `current_meeting` | handleCurrentMeeting | |
 | `remove_meeting` | handleRemoveMeeting | admin only |
+| `my_progress` | handleMyProgress | |
+| `group_progress` | handleGroupProgress | |
+| `set_progress_audio` | handleSetProgressAudio | enters percentage text state |
+| `set_progress_paper` | handleSetProgressPaper | enters total-pages text state |
+| `update_progress` | handleUpdateProgress | re-enters value for existing progress |
+| `restart_progress` | handleRestartProgress | deletes record, shows type selection |
 | `pick_meeting_book:<i>:<queryId>` | handlePickMeetingBook | |
 | `cal_noop` | answerCbQuery (silent) | header / past days / empty cells |
 | `cal_nav:<year>:<month>` | handleCalendarNav | edits calendar in place |
@@ -249,3 +281,4 @@ All callback data stays well under Telegram's 64-byte limit.
 - No voting or social features yet.
 - No user authentication beyond Telegram identity.
 - If a book referenced by a meeting is deleted, the meeting view shows "Unknown" for the title — no guard is in place yet.
+- No pagination on Group Progress.

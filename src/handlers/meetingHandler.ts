@@ -2,6 +2,7 @@ import { Markup } from 'telegraf';
 import { BotContext } from '../types/context';
 import { Meeting } from '../models/Meeting';
 import { Book, IBook } from '../models/Book';
+import { Progress } from '../models/Progress';
 import { getSession, setSession, resetSession, MeetingBookOption } from '../session/sessionManager';
 import { buildCalendar, formatCalendarHeader, formatMeetingDate } from '../utils/calendar';
 import { escapeHtml, formatSavedBooksList } from '../utils/formatters';
@@ -153,6 +154,12 @@ export async function handleCalendarDay(
   }
 
   try {
+    // Remove progress from the previous meeting before replacing it
+    const previousMeeting = await Meeting.findOne({ isActive: true });
+    if (previousMeeting) {
+      await Progress.deleteMany({ meeting: previousMeeting._id });
+    }
+
     // Deactivate any existing active meeting
     await Meeting.updateMany({ isActive: true }, { isActive: false });
 
@@ -227,6 +234,9 @@ export async function handleRemoveMeeting(ctx: BotContext): Promise<void> {
     await ctx.answerCbQuery('No active meeting to remove.', { show_alert: true });
     return;
   }
+
+  // Clean up all progress records for the removed meeting
+  await Progress.deleteMany({ meeting: deleted._id });
 
   await ctx.answerCbQuery('Meeting removed! ✅');
   await ctx.reply('The meeting has been removed.');

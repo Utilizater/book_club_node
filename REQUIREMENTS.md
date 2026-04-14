@@ -119,6 +119,7 @@ Flow:
 Constraints:
 - Only users with `is_admin = true` can access this flow. Other users receive an error if they somehow trigger it.
 - Only future dates can be selected (today included).
+- When a new meeting is created, all progress records from the previous meeting are deleted.
 
 ---
 
@@ -141,6 +142,46 @@ An admin can remove the active meeting.
 - Accessible via the **Remove Meeting** button on the Current Meeting screen.
 - The meeting record is permanently deleted.
 - Only admins can remove a meeting.
+
+---
+
+### F-09 — Reading Progress (My Progress)
+**Status:** Implemented
+
+A member can record how far they are in reading the current meeting's book.
+
+Flow — first time for a new meeting:
+1. User taps **My Progress**.
+2. Bot shows the active meeting's book and asks for reading type: **Audio Book** or **Paper Book**.
+3. **Paper Book path:**
+   - Bot asks for the total number of pages.
+   - Bot asks for the current page.
+   - Percentage is calculated automatically: `round(currentPage / totalPages * 100)`.
+4. **Audio Book path:**
+   - Bot asks for a percentage (0–100).
+5. Progress is saved and the user returns to the main menu.
+
+Flow — returning user (progress already set):
+- User sees their current progress (type, page or percentage).
+- Buttons: **Update Progress** (re-enter value), **Restart** (delete and pick type again).
+
+Constraints:
+- Progress is tied to the active meeting. There is no progress outside of an active meeting.
+- Page numbers must be 0 or greater and cannot exceed the total page count.
+- Percentage must be between 0 and 100.
+- When admin creates or removes a meeting, all progress records for that meeting are deleted.
+
+---
+
+### F-10 — Group Progress
+**Status:** Implemented
+
+Any user can see the reading progress of everyone who has set their progress for the current meeting.
+
+- Shows a leaderboard sorted by percentage (highest first).
+- Top three entries show 🥇 🥈 🥉 medals.
+- Each entry shows the user's name and their progress (page count for paper, percentage for audio).
+- If no one has set progress yet, a friendly empty state is shown.
 
 ---
 

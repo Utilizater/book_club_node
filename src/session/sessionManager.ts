@@ -6,11 +6,14 @@ export type SessionState =
   | 'showing_search_results'
   | 'showing_selected_book'
   | 'scheduling_meeting_book_select'
-  | 'scheduling_meeting_date_select';
+  | 'scheduling_meeting_date_select'
+  | 'setting_progress_total_pages'
+  | 'setting_progress_current_page'
+  | 'setting_progress_percentage';
 
 // Minimal book shape stored in session for meeting scheduling
 export interface MeetingBookOption {
-  id: string;   // MongoDB _id as string
+  id: string;
   title: string;
   authors: string[];
   publishedDate?: string;
@@ -24,8 +27,10 @@ export interface Session {
   queryId?: string;
   // Meeting scheduling flow
   meetingBooks?: MeetingBookOption[];
-  meetingBookId?: string;     // _id of the chosen book
+  meetingBookId?: string;
   meetingQueryId?: string;
+  // Reading progress flow
+  progressTotalPages?: number;
 }
 
 const sessions = new Map<number, Session>();

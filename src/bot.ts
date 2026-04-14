@@ -20,6 +20,17 @@ import {
   handleCurrentMeeting,
   handleRemoveMeeting,
 } from './handlers/meetingHandler';
+import {
+  handleMyProgress,
+  handleSetProgressAudio,
+  handleSetProgressPaper,
+  handleUpdateProgress,
+  handleRestartProgress,
+  handleGroupProgress,
+  handleProgressTotalPagesInput,
+  handleProgressCurrentPageInput,
+  handleProgressPercentageInput,
+} from './handlers/progressHandler';
 import { getSession, resetSession } from './session/sessionManager';
 
 export function createBot(): Telegraf<BotContext> {
@@ -32,11 +43,24 @@ export function createBot(): Telegraf<BotContext> {
     await showMainMenu(ctx);
   });
 
-  // Route text input to the active session handler
+  // Route text input based on current session state
   bot.on(message('text'), async (ctx) => {
     const session = getSession(ctx.chat.id);
-    if (session.state === 'waiting_for_search_query') {
-      await handleSearchInput(ctx, ctx.message.text);
+    const text = ctx.message.text;
+
+    switch (session.state) {
+      case 'waiting_for_search_query':
+        await handleSearchInput(ctx, text);
+        break;
+      case 'setting_progress_total_pages':
+        await handleProgressTotalPagesInput(ctx, text);
+        break;
+      case 'setting_progress_current_page':
+        await handleProgressCurrentPageInput(ctx, text);
+        break;
+      case 'setting_progress_percentage':
+        await handleProgressPercentageInput(ctx, text);
+        break;
     }
   });
 
@@ -121,6 +145,33 @@ export function createBot(): Telegraf<BotContext> {
       parseInt(ctx.match[2], 10),
       parseInt(ctx.match[3], 10)
     );
+  });
+
+  // ── Progress ──────────────────────────────────────────────────────────────
+  bot.action('my_progress', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleMyProgress(ctx);
+  });
+
+  bot.action('group_progress', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleGroupProgress(ctx);
+  });
+
+  bot.action('set_progress_audio', async (ctx) => {
+    await handleSetProgressAudio(ctx);
+  });
+
+  bot.action('set_progress_paper', async (ctx) => {
+    await handleSetProgressPaper(ctx);
+  });
+
+  bot.action('update_progress', async (ctx) => {
+    await handleUpdateProgress(ctx);
+  });
+
+  bot.action('restart_progress', async (ctx) => {
+    await handleRestartProgress(ctx);
   });
 
   // Global error handler — keeps the bot alive and gives the user feedback
