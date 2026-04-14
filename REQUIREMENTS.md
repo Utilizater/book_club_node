@@ -185,12 +185,46 @@ Any user can see the reading progress of everyone who has set their progress for
 
 ---
 
+### F-11 — Book Election
+**Status:** Implemented
+
+An admin can run a two-round election to choose the next book the club will read.
+
+Flow:
+1. Admin taps **Book Election** → then **Start Election**.
+2. A snapshot of all books currently in the system (deduplicated by Google volume ID) is taken. This snapshot is stable for the lifetime of the election — adding or removing books later does not affect it.
+3. **Round 1 — Like voting:**
+   - All users see the full book list with current vote counts.
+   - Each user may vote for any number of books (including all of them). Votes can be toggled on and off.
+   - Live vote counts are visible to everyone.
+   - Admin taps **Close Round 1** to advance.
+4. **Finalist selection:**
+   - The top two distinct vote counts are identified. All books whose count falls within either of those values become finalists.
+   - If all books have the same vote count, all advance.
+   - Books with zero votes are excluded.
+   - If no votes were cast, Round 1 cannot be closed.
+5. **Round 2 — Anonymous pick:**
+   - Users see only the finalist books (no vote counts shown).
+   - Each user picks exactly one book. Their choice can be changed before the admin closes voting.
+   - Vote counts are hidden until the admin closes Round 2.
+6. Admin taps **Close Round 2**. Vote counts are revealed. The book(s) with the most votes are declared the winner(s).
+   - If two or more books are tied for first, they are announced as co-winners. No further tiebreaker round is provided.
+7. Results are stored and visible to all users after the election ends.
+
+At any point while an election is active, an admin can tap **Cancel Election** to discard it entirely.
+
+Constraints:
+- Only one active election at a time (either Round 1 or Round 2).
+- Only admins can start, advance, or cancel an election.
+- Any user can view the current state of an active election and cast their vote.
+- The most recently completed election remains viewable until a new one is started.
+
+---
+
 ## Out of scope (not yet implemented)
 
 The following are planned for future iterations and must not be built until requirements are written here first.
 
-- Voting / rating books
 - Shared club-wide book list
-- Reading progress tracking
 - Notifications / reminders
 - Book recommendations

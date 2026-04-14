@@ -6,6 +6,7 @@ export async function showMainMenu(ctx: BotContext): Promise<void> {
     [Markup.button.callback('📚 Add Book', 'add_book'), Markup.button.callback('📖 View Books', 'view_books')],
     [Markup.button.callback('📆 Current Meeting', 'current_meeting')],
     [Markup.button.callback('📊 My Progress', 'my_progress'), Markup.button.callback('👥 Group Progress', 'group_progress')],
+    [Markup.button.callback('🗳 Book Election', 'election')],
   ];
 
   if (ctx.dbUser?.isAdmin) {

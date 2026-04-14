@@ -31,6 +31,16 @@ import {
   handleProgressCurrentPageInput,
   handleProgressPercentageInput,
 } from './handlers/progressHandler';
+import {
+  handleElection,
+  handleStartElection,
+  handleToggleVoteR1,
+  handleElectionRefresh,
+  handleCloseRound1,
+  handleVoteRound2,
+  handleCloseRound2,
+  handleCancelElection,
+} from './handlers/electionHandler';
 import { getSession, resetSession } from './session/sessionManager';
 
 export function createBot(): Telegraf<BotContext> {
@@ -172,6 +182,42 @@ export function createBot(): Telegraf<BotContext> {
 
   bot.action('restart_progress', async (ctx) => {
     await handleRestartProgress(ctx);
+  });
+
+  // ── Election ──────────────────────────────────────────────────────────────
+  bot.action('election', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleElection(ctx);
+  });
+
+  bot.action('start_election', async (ctx) => {
+    await handleStartElection(ctx);
+  });
+
+  bot.action('election_refresh', async (ctx) => {
+    await handleElectionRefresh(ctx);
+  });
+
+  bot.action('election_close_r1', async (ctx) => {
+    await handleCloseRound1(ctx);
+  });
+
+  bot.action('election_close_r2', async (ctx) => {
+    await handleCloseRound2(ctx);
+  });
+
+  bot.action('election_cancel', async (ctx) => {
+    await handleCancelElection(ctx);
+  });
+
+  // el_toggle_r1:<bookId>
+  bot.action(/^el_toggle_r1:([0-9a-f]{24})$/, async (ctx) => {
+    await handleToggleVoteR1(ctx, ctx.match[1]);
+  });
+
+  // el_vote_r2:<bookId>
+  bot.action(/^el_vote_r2:([0-9a-f]{24})$/, async (ctx) => {
+    await handleVoteRound2(ctx, ctx.match[1]);
   });
 
   // Global error handler — keeps the bot alive and gives the user feedback
